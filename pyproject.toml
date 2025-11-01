@@ -1,0 +1,127 @@
+[project]
+name = "devrelay"
+version = "0.1.0"
+description = "MITM proxy for removing Content-Security-Policy headers"
+readme = "README.md"
+requires-python = ">=3.13"
+authors = [
+    { name = "Bernardo Donadio", email = "bernardo@donadio.solutions" }
+]
+license = { text = "MIT" }
+keywords = ["proxy", "mitm", "csp", "security"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: Proxy Servers",
+    "Topic :: Security",
+]
+
+dependencies = [
+    "mitmproxy>=12.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-cov>=7.0.0",
+    "pytest-asyncio>=1.2.0",
+    "pytest-xdist>=3.6.0",
+    "black>=25.9.0",
+    "flake8>=7.1.0",
+    "pyright>=1.1.0",
+    "pymarkdownlnt>=0.9.0",
+    "pre-commit>=4.0.0",
+]
+
+[project.scripts]
+devrelay = "devrelay.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.black]
+line-length = 120
+target-version = ["py313"]
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = [
+    "-ra",
+    "-q",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=devrelay",
+    "--cov-branch",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+    "-n",
+    "auto",
+]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    "ignore:.*tagMap is deprecated.*:DeprecationWarning:pyasn1",
+    "ignore:.*typeMap is deprecated.*:DeprecationWarning:pyasn1",
+]
+
+[tool.coverage.run]
+source = ["devrelay"]
+branch = true
+omit = [
+    "tests/*",
+    ".venv/*",
+    "devrelay/__main__.py",
+]
+
+[tool.coverage.report]
+fail_under = 100
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
+
+[tool.pyright]
+include = ["devrelay", "tests"]
+exclude = [
+    "**/__pycache__",
+    ".venv",
+]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.13"
+pythonPlatform = "Linux"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = false
+reportUnknownMemberType = false
+reportUnknownArgumentType = false
+reportUnknownVariableType = false
+reportPrivateImportUsage = false
+
+[tool.hatch.build.targets.wheel]
+packages = ["devrelay"]

@@ -1,0 +1,29 @@
+repos:
+  # Standard pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  # Gitleaks for secrets detection
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.22.1
+    hooks:
+      - id: gitleaks
+
+  # Black formatter in check mode
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+      - id: black
+        args: [--check, --line-length=120]
+        language_version: python3.13
+
+  # Pymarkdownlnt in check mode
+  - repo: https://github.com/jackdewinter/pymarkdown
+    rev: v0.9.27
+    hooks:
+      - id: pymarkdown
+        args: [--config, .pymarkdown.json, scan]
+        files: \.md$

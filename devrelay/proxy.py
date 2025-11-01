@@ -1,0 +1,93 @@
+"""DevRelay proxy server configuration and startup."""
+
+import asyncio
+from pathlib import Path
+from typing import Optional
+
+from mitmproxy import options
+from mitmproxy.tools import dump
+
+from devrelay.addons import (
+    COEPRemoverAddon,
+    COOPRemoverAddon,
+    CORPInserterAddon,
+    CORSInserterForWebhooksAddon,
+    CORSPreflightForWebhooksAddon,
+    CSPRemoverAddon,
+)
+
+
+class ProxyServer:
+    """
+    MITM proxy server that removes security headers for easier testing.
+
+    Configured to listen on port 8080 with support for:
+    - TLS 1.2 or greater
+    - HTTP/2 and HTTP/3
+    - WebSocket connections
+    - Certificate storage in ~/.mitmproxy
+
+    Enabled addons:
+    - CSPRemoverAddon: Removes Content-Security-Policy headers
+    - COEPRemoverAddon: Removes Cross-Origin-Embedder-Policy headers
+    - COOPRemoverAddon: Removes Cross-Origin-Opener-Policy headers
+    - CORPInserterAddon: Adds Cross-Origin-Resource-Policy header to successful mutations
+    - CORSInserterForWebhooksAddon: Adds CORS headers to successful mutations
+    - CORSPreflightForWebhooksAddon: Rewrites failed OPTIONS requests with CORS headers
+    """
+
+    def __init__(
+        self,
+        host: str = "127.0.0.1",
+        port: int = 8080,
+        confdir: Optional[Path] = None,
+    ) -> None:
+        """
+        Initialize the proxy server.
+
+        Args:
+            host: Host address to bind to (default: 127.0.0.1)
+            port: Port to listen on (default: 8080)
+            confdir: Configuration directory for certificates
+                    (default: ~/.mitmproxy)
+        """
+        self.host = host
+        self.port = port
+        self.confdir = confdir or Path.home() / ".mitmproxy"
+
+    async def start(self) -> None:
+        """Start the proxy server."""
+        # Configure mitmproxy options
+        opts = options.Options(
+            listen_host=self.host,
+            listen_port=self.port,
+            confdir=str(self.confdir),
+            # TLS settings
+            ssl_insecure=False,  # Verify upstream certificates
+            # Protocol support
+            http2=True,  # Enable HTTP/2
+            http3=True,  # Enable HTTP/3
+            websocket=True,  # Enable WebSocket
+        )
+
+        # Create master with our addons
+        master = dump.DumpMaster(
+            opts,
+            with_termlog=True,
+            with_dumper=False,
+        )
+        master.addons.add(CSPRemoverAddon())
+        master.addons.add(COEPRemoverAddon())
+        master.addons.add(COOPRemoverAddon())
+        master.addons.add(CORPInserterAddon())
+        master.addons.add(CORSInserterForWebhooksAddon())
+        master.addons.add(CORSPreflightForWebhooksAddon())
+
+        try:
+            await master.run()
+        except KeyboardInterrupt:
+            master.shutdown()
+
+    def run(self) -> None:
+        """Run the proxy server (blocking)."""
+        asyncio.run(self.start())
