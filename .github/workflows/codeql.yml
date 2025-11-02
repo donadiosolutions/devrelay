@@ -13,6 +13,11 @@ on:
     - cron: '0 6 * * 1'
   workflow_dispatch:  # Allow manual triggering
 
+# Cancel in-progress runs for the same workflow
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   security-events: write
@@ -64,10 +69,6 @@ jobs:
           config-file: ./.github/codeql/codeql-config.yml
           # Use latest CodeQL bundle
           tools: latest
-          # Enable debug mode for detailed logs (optional, can be removed in production)
-          debug: false
-          # Additional queries from CodeQL query packs
-          queries: +security-and-quality,+security-extended
           # Setup Python dependencies for better analysis
           setup-python-dependencies: true
 
@@ -92,13 +93,6 @@ jobs:
           name: codeql-results-${{ matrix.language }}
           path: codeql-results-${{ matrix.language }}.sarif
           retention-days: 30
-
-      - name: Upload SARIF to GitHub
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: codeql-results-${{ matrix.language }}.sarif
-          category: "/language:${{ matrix.language }}"
 
   # Summary job to check overall status
   codeql-summary:

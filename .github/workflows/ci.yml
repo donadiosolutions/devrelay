@@ -7,6 +7,11 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+# Cancel in-progress runs for the same workflow
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality-checks:
     name: Quality Checks
@@ -54,7 +59,7 @@ jobs:
 
       - name: Lint markdown files
         run: |
-          .venv/bin/pymarkdown --config .pymarkdown.json scan *.md
+          .venv/bin/pymarkdown --config .pymarkdown.json scan .
         continue-on-error: false
 
       - name: Type check with pyright
@@ -64,7 +69,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          .venv/bin/pytest --junit-xml=junit.xml
+          .venv/bin/pytest
         continue-on-error: false
 
       - name: Upload coverage to Codecov
