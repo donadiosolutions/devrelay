@@ -1,0 +1,49 @@
+# Codecov Configuration
+# Documentation: https://docs.codecov.com/docs/codecov-yaml
+
+coverage:
+  status:
+    project:
+      default:
+        # Require 100% coverage to pass (aligns with pyproject.toml fail_under=100)
+        target: 100%
+        threshold: 5%  # No decrease in coverage allowed
+        if_ci_failed: error
+
+    patch:
+      default:
+        # New code must also have 100% coverage
+        target: 100%
+        threshold: 5%
+        if_ci_failed: error
+
+  precision: 2  # Show coverage to 2 decimal places
+  round: down   # Round coverage down
+  range: "90...100"  # Color coding: red below 90%, green at 100%
+
+comment:
+  layout: "header, diff, files, footer"
+  behavior: default  # Post new comment on each PR update
+  require_changes: false
+  require_base: false
+  require_head: true
+
+ignore:
+  - "tests/**/*"
+  - ".venv/**/*"
+  - "devrelay/__main__.py"
+  - "**/__pycache__/**/*"
+  - ".pytest_cache/**/*"
+  - "htmlcov/**/*"
+  - "*.egg-info/**/*"
+
+# GitHub checks configuration
+github_checks:
+  annotations: true  # Show coverage annotations on PR files
+
+# Flags for different types of coverage (future use)
+flags:
+  unittests:
+    paths:
+      - devrelay/
+    carryforward: true

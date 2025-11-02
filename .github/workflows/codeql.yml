@@ -1,0 +1,119 @@
+name: "CodeQL Advanced Security Scanning"
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+    types: [opened, synchronize, reopened]
+  schedule:
+    # Run every Monday at 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:  # Allow manual triggering
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+  pull-requests: read
+
+jobs:
+  analyze:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['python']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            .venv
+            ~/.cache/uv
+          key: ${{ runner.os }}-uv-codeql-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Install dependencies
+        run: make dev
+
+      # Initialize CodeQL with custom configuration
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          config-file: ./.github/codeql/codeql-config.yml
+          # Use latest CodeQL bundle
+          tools: latest
+          # Enable debug mode for detailed logs (optional, can be removed in production)
+          debug: false
+          # Additional queries from CodeQL query packs
+          queries: +security-and-quality,+security-extended
+          # Setup Python dependencies for better analysis
+          setup-python-dependencies: true
+
+      # No explicit build needed for Python (interpreted language)
+      # CodeQL will automatically discover Python code
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+          # Upload SARIF even if there are findings
+          upload: true
+          # Set severity threshold - fail on high/critical
+          fail-on: error
+          # Output SARIF file for artifacts
+          output: codeql-results-${{ matrix.language }}.sarif
+
+      - name: Upload CodeQL results as artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: codeql-results-${{ matrix.language }}
+          path: codeql-results-${{ matrix.language }}.sarif
+          retention-days: 30
+
+      - name: Upload SARIF to GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: codeql-results-${{ matrix.language }}.sarif
+          category: "/language:${{ matrix.language }}"
+
+  # Summary job to check overall status
+  codeql-summary:
+    name: CodeQL Summary
+    runs-on: ubuntu-latest
+    needs: analyze
+    if: always()
+    steps:
+      - name: Check CodeQL status
+        run: |
+          if [[ "${{ needs.analyze.result }}" == "failure" ]]; then
+            echo "::error::CodeQL analysis found security issues"
+            exit 1
+          elif [[ "${{ needs.analyze.result }}" == "success" ]]; then
+            echo "✓ CodeQL analysis completed successfully"
+          else
+            echo "::warning::CodeQL analysis status: ${{ needs.analyze.result }}"
+          fi

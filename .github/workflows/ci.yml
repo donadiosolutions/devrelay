@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  quality-checks:
+    name: Quality Checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            .venv
+            ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Install dependencies
+        run: make dev
+
+      - name: Check code formatting with black
+        run: |
+          .venv/bin/black --check devrelay tests
+        continue-on-error: false
+
+      - name: Lint code with flake8
+        run: |
+          .venv/bin/flake8 devrelay tests --max-line-length=120 --extend-ignore=E203,W503
+        continue-on-error: false
+
+      - name: Lint markdown files
+        run: |
+          .venv/bin/pymarkdown --config .pymarkdown.json scan *.md
+        continue-on-error: false
+
+      - name: Type check with pyright
+        run: |
+          .venv/bin/pyright
+        continue-on-error: false
+
+      - name: Run tests with coverage
+        run: |
+          .venv/bin/pytest --junit-xml=junit.xml
+        continue-on-error: false
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml,./junit.xml
+          flags: unittests
+          name: codecov-devrelay
+          fail_ci_if_error: true
+          verbose: true
+
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Test Results
+          path: junit.xml
+          reporter: java-junit
+          fail-on-error: true
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: junit.xml
+          retention-days: 7
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-reports
+          path: |
+            coverage.xml
+            htmlcov/
+          retention-days: 7
