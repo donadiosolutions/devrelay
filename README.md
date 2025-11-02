@@ -1,5 +1,8 @@
 # DevRelay
 
+[![codecov](https://codecov.io/gh/donadiosolutions/devrelay/branch/master/graph/badge.svg)](https://codecov.io/gh/donadiosolutions/devrelay)
+[![CI](https://github.com/donadiosolutions/devrelay/actions/workflows/ci.yml/badge.svg)](https://github.com/donadiosolutions/devrelay/actions/workflows/ci.yml)
+
 A MITM (Man-in-the-Middle) proxy that removes security headers from HTTP requests and responses, allowing for easier
 web development and testing.
 
