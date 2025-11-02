@@ -212,7 +212,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4
-        if: always()
+        if: always() && github.actor != 'dependabot[bot]'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.xml,./junit.xml
@@ -223,7 +223,7 @@ jobs:
 
       - name: Publish test results
         uses: dorny/test-reporter@d61b558e8df85cb60d09ca3e5b09653b4477cea7 # v1
-        if: always()
+        if: always() && github.actor != 'dependabot[bot]'
         with:
           name: Test Results
           path: junit.xml
