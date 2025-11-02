@@ -62,7 +62,7 @@ jobs:
 
       # Initialize CodeQL with custom configuration
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@ab2e54f42aa112ff08704159b88a57517f6f0ebb # v3
+        uses: github/codeql-action/init@5d5cd550d3e189c569da8f16ea8de2d821c9bf7a # v3
         with:
           languages: ${{ matrix.language }}
           config-file: ./.github/codeql/codeql-config.yml
@@ -75,7 +75,7 @@ jobs:
       # CodeQL will automatically discover Python code
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@ab2e54f42aa112ff08704159b88a57517f6f0ebb # v3
+        uses: github/codeql-action/analyze@5d5cd550d3e189c569da8f16ea8de2d821c9bf7a # v3
         with:
           category: "/language:${{ matrix.language }}"
           # Upload SARIF even if there are findings
