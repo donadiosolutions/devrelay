@@ -27,7 +27,7 @@ permissions:
 jobs:
   analyze:
     name: CodeQL Analysis
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
 
     strategy:
@@ -96,7 +96,7 @@ jobs:
   # Summary job to check overall status
   codeql-summary:
     name: CodeQL Summary
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: analyze
     if: always()
     steps:
