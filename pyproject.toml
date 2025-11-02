@@ -21,6 +21,7 @@ classifiers = [
 
 dependencies = [
     "mitmproxy>=12.2.0",
+    "ruamel.yaml>=0.18.0",
 ]
 
 [project.optional-dependencies]

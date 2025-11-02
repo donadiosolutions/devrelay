@@ -1,78 +1,46 @@
 """DevRelay CLI"""
 
-import argparse
 import sys
 from pathlib import Path
 from typing import NoReturn
 
+from devrelay.config import ConfigLoader
 from devrelay.proxy import ProxyServer
 
 
 class DevRelayCLI:
     """CLI for DevRelay proxy server."""
 
-    def __init__(self) -> None:
-        """Initialize the CLI with argument parser."""
-        self.parser = argparse.ArgumentParser(
-            description="DevRelay - MITM proxy that removes CSP headers",
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        )
-        self._setup_arguments()
-
-    def _setup_arguments(self) -> None:
-        """Configure CLI arguments."""
-        self.parser.add_argument(
-            "--host",
-            type=str,
-            default="127.0.0.1",
-            help="Host address to bind to",
-        )
-        self.parser.add_argument(
-            "--port",
-            type=int,
-            default=8080,
-            help="Port to listen on",
-        )
-        self.parser.add_argument(
-            "--confdir",
-            type=Path,
-            default=None,
-            help="Configuration directory for certificates (default: ~/.mitmproxy)",
-        )
-
-    def parse_args(self, args: list[str] | None = None) -> argparse.Namespace:
+    def __init__(self, config_path: Path | None = None) -> None:
         """
-        Parse command-line arguments.
+        Initialize the CLI with configuration loader.
 
         Args:
-            args: Optional list of arguments to parse (defaults to sys.argv)
-
-        Returns:
-            Parsed arguments namespace
+            config_path: Optional path to YAML config file (default: ~/.mitmproxy/devrelay.yaml)
         """
-        return self.parser.parse_args(args)
+        self.config_loader = ConfigLoader(config_path=config_path)
 
-    def display_startup_info(self, host: str, port: int, confdir: Path | None) -> None:
+    def display_startup_info(self, host: str, port: int, certdir: Path) -> None:
         """
         Display startup information to the user.
 
         Args:
             host: Host address being used
             port: Port number being used
-            confdir: Configuration directory path (or None for default)
+            certdir: Certificate directory path
         """
         print(f"Starting DevRelay proxy on {host}:{port}")
-        print(f"Certificate directory: {confdir or Path.home() / '.mitmproxy'}")
+        print(f"Certificate directory: {certdir}")
         print("\nPress Ctrl+C to stop the proxy\n")
 
-    def run_server(self, host: str, port: int, confdir: Path | None) -> int:
+    def run_server(self, host: str, port: int, certdir: Path) -> int:
         """
         Start and run the proxy server.
 
         Args:
             host: Host address to bind to
             port: Port number to listen on
-            confdir: Configuration directory for certificates
+            certdir: Certificate directory
 
         Returns:
             Exit code (0 for success, 1 for error)
@@ -81,7 +49,7 @@ class DevRelayCLI:
             server = ProxyServer(
                 host=host,
                 port=port,
-                confdir=confdir,
+                certdir=certdir,
             )
             server.run()
         except KeyboardInterrupt:
@@ -103,9 +71,13 @@ class DevRelayCLI:
         Returns:
             Exit code (0 for success, 1 for error)
         """
-        parsed_args = self.parse_args(args)
-        self.display_startup_info(parsed_args.host, parsed_args.port, parsed_args.confdir)
-        return self.run_server(parsed_args.host, parsed_args.port, parsed_args.confdir)
+        try:
+            config = self.config_loader.get_config(args)
+            self.display_startup_info(config.host, config.port, config.certdir)
+            return self.run_server(config.host, config.port, config.certdir)
+        except ValueError as e:
+            print(f"Configuration error: {e}", file=sys.stderr)
+            return 1
 
 
 def main() -> int:

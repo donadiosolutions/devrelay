@@ -2,7 +2,6 @@
 
 import asyncio
 from pathlib import Path
-from typing import Optional
 
 from mitmproxy import options
 from mitmproxy.tools import dump
@@ -40,7 +39,7 @@ class ProxyServer:
         self,
         host: str = "127.0.0.1",
         port: int = 8080,
-        confdir: Optional[Path] = None,
+        certdir: Path = Path.home() / ".mitmproxy",
     ) -> None:
         """
         Initialize the proxy server.
@@ -48,12 +47,11 @@ class ProxyServer:
         Args:
             host: Host address to bind to (default: 127.0.0.1)
             port: Port to listen on (default: 8080)
-            confdir: Configuration directory for certificates
-                    (default: ~/.mitmproxy)
+            certdir: Certificate directory (default: ~/.mitmproxy)
         """
         self.host = host
         self.port = port
-        self.confdir = confdir or Path.home() / ".mitmproxy"
+        self.certdir = certdir
 
     async def start(self) -> None:
         """Start the proxy server."""
@@ -61,7 +59,7 @@ class ProxyServer:
         opts = options.Options(
             listen_host=self.host,
             listen_port=self.port,
-            confdir=str(self.confdir),
+            confdir=str(self.certdir),
             # TLS settings
             ssl_insecure=False,  # Verify upstream certificates
             # Protocol support

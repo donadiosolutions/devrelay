@@ -440,7 +440,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "mitmproxy" },
-    { name = "pre-commit" },
+    { name = "ruamel-yaml" },
 ]
 
 [package.optional-dependencies]
@@ -461,7 +461,6 @@ requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = ">=25.9.0" },
     { name = "flake8", marker = "extra == 'dev'", specifier = ">=7.1.0" },
     { name = "mitmproxy", specifier = ">=12.2.0" },
-    { name = "pre-commit", specifier = ">=4.3.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "pymarkdownlnt", marker = "extra == 'dev'", specifier = ">=0.9.0" },
     { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1.0" },
@@ -469,6 +468,7 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.2.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.6.0" },
+    { name = "ruamel-yaml", specifier = ">=0.18.0" },
 ]
 provides-extras = ["dev"]
 

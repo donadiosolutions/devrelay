@@ -18,27 +18,27 @@ class TestProxyServer:
 
         assert server.host == "127.0.0.1"
         assert server.port == 8080
-        assert server.confdir == Path.home() / ".mitmproxy"
+        assert server.certdir == Path.home() / ".mitmproxy"
 
     def test_custom_initialization(self) -> None:
         """Test ProxyServer initialization with custom values."""
-        custom_confdir = Path("/tmp/test-mitmproxy")
+        custom_certdir = Path("/tmp/test-mitmproxy")
         server = ProxyServer(
             host="0.0.0.0",
             port=9090,
-            confdir=custom_confdir,
+            certdir=custom_certdir,
         )
 
         assert server.host == "0.0.0.0"
         assert server.port == 9090
-        assert server.confdir == custom_confdir
+        assert server.certdir == custom_certdir
 
-    def test_confdir_defaults_to_home_mitmproxy(self) -> None:
-        """Test that confdir defaults to ~/.mitmproxy when not specified."""
+    def test_certdir_defaults_to_home_mitmproxy(self) -> None:
+        """Test that certdir defaults to ~/.mitmproxy when not specified."""
         server = ProxyServer()
         expected_path = Path.home() / ".mitmproxy"
 
-        assert server.confdir == expected_path
+        assert server.certdir == expected_path
 
     @pytest.mark.asyncio
     async def test_start_creates_and_runs_master(self) -> None:
