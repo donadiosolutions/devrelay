@@ -1,6 +1,91 @@
 """DevRelay proxy addons for security header manipulation"""
 
+import difflib
 from mitmproxy import http
+
+# Addon name mapping for user-friendly names
+# Maps both short names and full class names to canonical class names
+ADDON_NAME_MAP = {
+    # Short names (case will be normalized to uppercase for lookup)
+    "CSP": "CSPRemoverAddon",
+    "COEP": "COEPRemoverAddon",
+    "COOP": "COOPRemoverAddon",
+    "CORP": "CORPInserterAddon",
+    "CORSINSERTER": "CORSInserterForWebhooksAddon",
+    "CORSPREFLIGHT": "CORSPreflightForWebhooksAddon",
+    # Full class names (for completeness)
+    "CSPREMOVERADDON": "CSPRemoverAddon",
+    "COEPREMOVERADDON": "COEPRemoverAddon",
+    "COOPREMOVERADDON": "COOPRemoverAddon",
+    "CORPINSERTERADDON": "CORPInserterAddon",
+    "CORSINSERTERFORWEBHOOKSADDON": "CORSInserterForWebhooksAddon",
+    "CORSPREFLIGHTFORWEBHOOKSADDON": "CORSPreflightForWebhooksAddon",
+}
+
+# All valid addon class names
+ALL_ADDON_NAMES = [
+    "CSPRemoverAddon",
+    "COEPRemoverAddon",
+    "COOPRemoverAddon",
+    "CORPInserterAddon",
+    "CORSInserterForWebhooksAddon",
+    "CORSPreflightForWebhooksAddon",
+]
+
+
+def validate_addon_names(addon_names: list[str]) -> list[str]:
+    """
+    Validate and normalize addon names to canonical class names.
+
+    Accepts both short names (e.g., "CSP", "COEP") and full class names
+    (e.g., "CSPRemoverAddon"). Case-insensitive matching is supported.
+
+    Args:
+        addon_names: List of addon names to validate
+
+    Returns:
+        List of canonical addon class names
+
+    Raises:
+        ValueError: If any addon name is invalid, with a suggestion for the first invalid name
+    """
+    validated = []
+
+    for name in addon_names:
+        # Normalize to uppercase for case-insensitive lookup
+        normalized = name.upper()
+
+        # Check if it's a valid addon name
+        if normalized in ADDON_NAME_MAP:
+            canonical_name = ADDON_NAME_MAP[normalized]
+            validated.append(canonical_name)
+        else:
+            # Invalid name - provide a suggestion using fuzzy matching
+            # Get all possible input names (both short and full)
+            all_possible_names = list(ADDON_NAME_MAP.keys())
+
+            # Find close matches (case-insensitive)
+            close_matches = difflib.get_close_matches(normalized, all_possible_names, n=1, cutoff=0.6)
+
+            if close_matches:
+                # Suggest the canonical class name for the close match
+                suggested_canonical = ADDON_NAME_MAP[close_matches[0]]
+                # Find a user-friendly version (prefer short names)
+                user_friendly = None
+                for key, value in ADDON_NAME_MAP.items():
+                    if value == suggested_canonical and len(key) <= 15:  # Prefer short names
+                        user_friendly = key
+                        break
+                if user_friendly is None:
+                    user_friendly = suggested_canonical
+
+                raise ValueError(f"Unknown addon '{name}'. Did you mean '{user_friendly}'?")
+            else:
+                # No close match - list all valid options
+                valid_short_names = ["CSP", "COEP", "COOP", "CORP", "CORSInserter", "CORSPreflight"]
+                raise ValueError(f"Unknown addon '{name}'. Valid addons: {', '.join(valid_short_names)}")
+
+    return validated
 
 
 class CSPRemoverAddon:

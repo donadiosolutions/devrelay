@@ -25,7 +25,7 @@ class TestDevRelayCLIClass:
         """Test display_startup_info outputs correct information."""
         cli_instance = cli.DevRelayCLI()
         with patch("builtins.print") as mock_print:
-            cli_instance.display_startup_info("127.0.0.1", 8080, Path.home() / ".mitmproxy")
+            cli_instance.display_startup_info("127.0.0.1", 8080, Path.home() / ".mitmproxy", [])
             assert mock_print.call_count == 3
             mock_print.assert_has_calls(
                 [
@@ -40,12 +40,29 @@ class TestDevRelayCLIClass:
         cli_instance = cli.DevRelayCLI()
         custom_certdir = Path("/tmp/custom")
         with patch("builtins.print") as mock_print:
-            cli_instance.display_startup_info("0.0.0.0", 9090, custom_certdir)
+            cli_instance.display_startup_info("0.0.0.0", 9090, custom_certdir, [])
             assert mock_print.call_count == 3
             mock_print.assert_has_calls(
                 [
                     call("Starting DevRelay proxy on 0.0.0.0:9090"),
                     call(f"Certificate directory: {custom_certdir}"),
+                    call("\nPress Ctrl+C to stop the proxy\n"),
+                ]
+            )
+
+    def test_display_startup_info_with_disabled_addons(self) -> None:
+        """Test display_startup_info shows disabled addons."""
+        cli_instance = cli.DevRelayCLI()
+        with patch("builtins.print") as mock_print:
+            cli_instance.display_startup_info(
+                "127.0.0.1", 8080, Path.home() / ".mitmproxy", ["CSPRemoverAddon", "COEPRemoverAddon"]
+            )
+            assert mock_print.call_count == 4
+            mock_print.assert_has_calls(
+                [
+                    call("Starting DevRelay proxy on 127.0.0.1:8080"),
+                    call(f"Certificate directory: {Path.home() / '.mitmproxy'}"),
+                    call("Disabled addons: CSPRemoverAddon, COEPRemoverAddon"),
                     call("\nPress Ctrl+C to stop the proxy\n"),
                 ]
             )
@@ -57,9 +74,27 @@ class TestDevRelayCLIClass:
             mock_server_instance = MagicMock()
             mock_proxy_server.return_value = mock_server_instance
 
-            result = cli_instance.run_server("127.0.0.1", 8080, Path.home() / ".mitmproxy")
+            result = cli_instance.run_server("127.0.0.1", 8080, Path.home() / ".mitmproxy", [])
 
-            mock_proxy_server.assert_called_once_with(host="127.0.0.1", port=8080, certdir=Path.home() / ".mitmproxy")
+            mock_proxy_server.assert_called_once_with(
+                host="127.0.0.1", port=8080, certdir=Path.home() / ".mitmproxy", disabled_addons=[]
+            )
+            mock_server_instance.run.assert_called_once()
+            assert result == 0
+
+    def test_run_server_with_disabled_addons(self) -> None:
+        """Test run_server passes disabled_addons to ProxyServer."""
+        cli_instance = cli.DevRelayCLI()
+        disabled_addons = ["CSPRemoverAddon", "COEPRemoverAddon"]
+        with patch("devrelay.cli.ProxyServer") as mock_proxy_server:
+            mock_server_instance = MagicMock()
+            mock_proxy_server.return_value = mock_server_instance
+
+            result = cli_instance.run_server("127.0.0.1", 8080, Path.home() / ".mitmproxy", disabled_addons)
+
+            mock_proxy_server.assert_called_once_with(
+                host="127.0.0.1", port=8080, certdir=Path.home() / ".mitmproxy", disabled_addons=disabled_addons
+            )
             mock_server_instance.run.assert_called_once()
             assert result == 0
 
@@ -72,7 +107,7 @@ class TestDevRelayCLIClass:
             mock_proxy_server.return_value = mock_server_instance
 
             with patch("builtins.print"):
-                result = cli_instance.run_server("127.0.0.1", 8080, Path.home() / ".mitmproxy")
+                result = cli_instance.run_server("127.0.0.1", 8080, Path.home() / ".mitmproxy", [])
 
             assert result == 0
 
@@ -85,7 +120,7 @@ class TestDevRelayCLIClass:
             mock_proxy_server.return_value = mock_server_instance
 
             with patch("builtins.print"):
-                result = cli_instance.run_server("127.0.0.1", 8080, Path.home() / ".mitmproxy")
+                result = cli_instance.run_server("127.0.0.1", 8080, Path.home() / ".mitmproxy", [])
 
             assert result == 1
 
@@ -104,8 +139,8 @@ class TestDevRelayCLIClass:
 
                 result = cli_instance.execute([])
 
-                mock_display.assert_called_once_with("127.0.0.1", 8080, Path.home() / ".mitmproxy")
-                mock_run.assert_called_once_with("127.0.0.1", 8080, Path.home() / ".mitmproxy")
+                mock_display.assert_called_once_with("127.0.0.1", 8080, Path.home() / ".mitmproxy", [])
+                mock_run.assert_called_once_with("127.0.0.1", 8080, Path.home() / ".mitmproxy", [])
                 assert result == 0
 
     def test_execute_with_custom_args(self) -> None:
@@ -123,8 +158,29 @@ class TestDevRelayCLIClass:
 
                 result = cli_instance.execute(["--host", "0.0.0.0", "--port", "9090", "--certdir", "/tmp/certs"])
 
-                mock_display.assert_called_once_with("0.0.0.0", 9090, Path("/tmp/certs"))
-                mock_run.assert_called_once_with("0.0.0.0", 9090, Path("/tmp/certs"))
+                mock_display.assert_called_once_with("0.0.0.0", 9090, Path("/tmp/certs"), [])
+                mock_run.assert_called_once_with("0.0.0.0", 9090, Path("/tmp/certs"), [])
+                assert result == 0
+
+    def test_execute_with_disabled_addons(self) -> None:
+        """Test execute method with disabled_addons."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "test.yaml"
+            cli_instance = cli.DevRelayCLI(config_path=config_path)
+            with (
+                patch.object(cli_instance, "display_startup_info") as mock_display,
+                patch.object(cli_instance, "run_server") as mock_run,
+            ):
+                mock_run.return_value = 0
+
+                result = cli_instance.execute(["--disable-addon", "CSP", "--disable-addon", "COEP"])
+
+                # Verify disabled_addons were validated and normalized
+                call_args = mock_display.call_args[0]
+                assert call_args[3] == ["CSPRemoverAddon", "COEPRemoverAddon"]
+                mock_run.assert_called_once()
                 assert result == 0
 
     def test_execute_with_config_error(self) -> None:
@@ -197,8 +253,8 @@ class TestDevRelayCLI:
                         result = test_cli.execute()
 
                         # Verify display was called with custom args
-                        mock_display.assert_called_once_with("0.0.0.0", 9090, Path.home() / ".mitmproxy")
-                        mock_run.assert_called_once_with("0.0.0.0", 9090, Path.home() / ".mitmproxy")
+                        mock_display.assert_called_once_with("0.0.0.0", 9090, Path.home() / ".mitmproxy", [])
+                        mock_run.assert_called_once_with("0.0.0.0", 9090, Path.home() / ".mitmproxy", [])
 
                         # Verify exit code
                         assert result == 0

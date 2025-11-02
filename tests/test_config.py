@@ -383,6 +383,7 @@ class TestConfigLoader:
         assert "host" in param_names
         assert "port" in param_names
         assert "certdir" in param_names
+        assert "disabled_addons" in param_names
 
         # Verify defaults
         for param in loader.parameters:
@@ -395,3 +396,203 @@ class TestConfigLoader:
             elif param.name == "certdir":
                 assert param.default == Path.home() / ".mitmproxy"
                 assert param.type == Path
+            elif param.name == "disabled_addons":
+                assert param.default == []
+                assert param.type == list
+
+    def test_parse_addon_list_with_none(self) -> None:
+        """Test that parse_addon_list handles None value."""
+        loader = ConfigLoader()
+        result = loader._parse_addon_list(None)  # pyright: ignore[reportPrivateUsage]
+        assert result == []
+
+    def test_parse_addon_list_with_list(self) -> None:
+        """Test that parse_addon_list handles list value."""
+        loader = ConfigLoader()
+        result = loader._parse_addon_list(["CSP", "COEP"])  # pyright: ignore[reportPrivateUsage]
+        assert result == ["CSP", "COEP"]
+
+    def test_parse_addon_list_with_comma_separated_string(self) -> None:
+        """Test that parse_addon_list handles comma-separated string."""
+        loader = ConfigLoader()
+        result = loader._parse_addon_list("CSP,COEP,COOP")  # pyright: ignore[reportPrivateUsage]
+        assert result == ["CSP", "COEP", "COOP"]
+
+    def test_parse_addon_list_with_whitespace(self) -> None:
+        """Test that parse_addon_list strips whitespace."""
+        loader = ConfigLoader()
+        result = loader._parse_addon_list("CSP, COEP , COOP")  # pyright: ignore[reportPrivateUsage]
+        assert result == ["CSP", "COEP", "COOP"]
+
+    def test_parse_addon_list_with_mixed_format(self) -> None:
+        """Test that parse_addon_list handles list with comma-separated items."""
+        loader = ConfigLoader()
+        result = loader._parse_addon_list(["CSP,COEP", "COOP"])  # pyright: ignore[reportPrivateUsage]
+        assert result == ["CSP", "COEP", "COOP"]
+
+    def test_parse_addon_list_with_empty_string(self) -> None:
+        """Test that parse_addon_list handles empty string."""
+        loader = ConfigLoader()
+        result = loader._parse_addon_list("")  # pyright: ignore[reportPrivateUsage]
+        assert result == []
+
+    def test_parse_addon_list_filters_empty_items(self) -> None:
+        """Test that parse_addon_list filters out empty items."""
+        loader = ConfigLoader()
+        result = loader._parse_addon_list("CSP,,COEP,")  # pyright: ignore[reportPrivateUsage]
+        assert result == ["CSP", "COEP"]
+
+    def test_validate_value_for_disabled_addons_valid(self) -> None:
+        """Test that validate_value validates disabled_addons correctly."""
+        loader = ConfigLoader()
+        param = Parameter(name="disabled_addons", type=list, default=[], help="help")
+
+        result = loader._validate_value(param, ["CSP", "COEP"])  # pyright: ignore[reportPrivateUsage]
+        assert result == ["CSPRemoverAddon", "COEPRemoverAddon"]
+
+    def test_validate_value_for_disabled_addons_invalid(self) -> None:
+        """Test that validate_value raises on invalid addon name."""
+        loader = ConfigLoader()
+        param = Parameter(name="disabled_addons", type=list, default=[], help="help")
+
+        with pytest.raises(ValueError, match="Unknown addon"):
+            loader._validate_value(param, ["InvalidAddon"])  # pyright: ignore[reportPrivateUsage]
+
+    def test_validate_value_for_disabled_addons_none(self) -> None:
+        """Test that validate_value returns empty list for None."""
+        loader = ConfigLoader()
+        param = Parameter(name="disabled_addons", type=list, default=[], help="help")
+
+        result = loader._validate_value(param, None)  # pyright: ignore[reportPrivateUsage]
+        assert result == []
+
+    def test_get_config_with_disabled_addons_from_cli(self) -> None:
+        """Test getting configuration with disabled_addons from CLI."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "test.yaml"
+            loader = ConfigLoader(config_path=config_path)
+
+            config = loader.get_config(["--disable-addon", "CSP", "--disable-addon", "COEP"])
+
+            assert config.disabled_addons == ["CSPRemoverAddon", "COEPRemoverAddon"]
+
+    def test_get_config_with_disabled_addons_comma_separated(self) -> None:
+        """Test getting configuration with comma-separated disabled_addons."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "test.yaml"
+            loader = ConfigLoader(config_path=config_path)
+
+            config = loader.get_config(["--disable-addon", "CSP,COEP"])
+
+            assert config.disabled_addons == ["CSPRemoverAddon", "COEPRemoverAddon"]
+
+    def test_get_config_with_disabled_addons_mixed_format(self) -> None:
+        """Test getting configuration with mixed CLI format."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "test.yaml"
+            loader = ConfigLoader(config_path=config_path)
+
+            config = loader.get_config(["--disable-addon", "CSP,COEP", "--disable-addon", "COOP"])
+
+            assert config.disabled_addons == ["CSPRemoverAddon", "COEPRemoverAddon", "COOPRemoverAddon"]
+
+    def test_get_config_with_disabled_addons_from_yaml(self) -> None:
+        """Test getting configuration with disabled_addons from YAML."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "test.yaml"
+            loader = ConfigLoader(config_path=config_path)
+
+            # Create YAML with disabled_addons
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(config_path, "w") as f:
+                loader.yaml.dump({"disabled_addons": ["CSP", "COEP"]}, f)
+
+            config = loader.get_config([])
+
+            assert config.disabled_addons == ["CSPRemoverAddon", "COEPRemoverAddon"]
+
+    def test_get_config_with_disabled_addons_cli_overrides_yaml(self) -> None:
+        """Test that CLI disabled_addons override YAML."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "test.yaml"
+            loader = ConfigLoader(config_path=config_path)
+
+            # Create YAML with disabled_addons
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(config_path, "w") as f:
+                loader.yaml.dump({"disabled_addons": ["CSP"]}, f)
+
+            config = loader.get_config(["--disable-addon", "COEP"])
+
+            # CLI should override YAML
+            assert config.disabled_addons == ["COEPRemoverAddon"]
+
+    def test_get_config_with_disabled_addons_invalid_name(self) -> None:
+        """Test that invalid addon name in CLI raises error."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "test.yaml"
+            loader = ConfigLoader(config_path=config_path)
+
+            with pytest.raises(ValueError, match="Unknown addon"):
+                loader.get_config(["--disable-addon", "InvalidAddon"])
+
+    def test_get_config_with_disabled_addons_case_insensitive(self) -> None:
+        """Test that disabled_addons are case-insensitive."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "test.yaml"
+            loader = ConfigLoader(config_path=config_path)
+
+            config = loader.get_config(["--disable-addon", "csp,COEP"])
+
+            assert config.disabled_addons == ["CSPRemoverAddon", "COEPRemoverAddon"]
+
+    def test_get_config_with_empty_disabled_addons(self) -> None:
+        """Test that empty disabled_addons returns empty list."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "test.yaml"
+            loader = ConfigLoader(config_path=config_path)
+
+            config = loader.get_config([])
+
+            assert config.disabled_addons == []
+
+    def test_build_parser_includes_disable_addon_argument(self) -> None:
+        """Test that parser includes --disable-addon argument."""
+        loader = ConfigLoader()
+        parser = loader.parser
+
+        # Test that --disable-addon is accepted
+        args = parser.parse_args(["--disable-addon", "CSP"])
+        assert args.disabled_addons == ["CSP"]
+
+    def test_build_parser_disable_addon_allows_multiple(self) -> None:
+        """Test that --disable-addon can be used multiple times."""
+        loader = ConfigLoader()
+        parser = loader.parser
+
+        args = parser.parse_args(["--disable-addon", "CSP", "--disable-addon", "COEP"])
+        assert args.disabled_addons == ["CSP", "COEP"]
+
+    def test_parse_addon_list_with_non_string_items(self) -> None:
+        """Test that parse_addon_list handles non-string items in list."""
+        loader = ConfigLoader()
+        # This tests the else branch at line 129 where item is not a string
+        result = loader._parse_addon_list([123, 456])  # pyright: ignore[reportPrivateUsage]
+        assert result == [123, 456]
+
+    def test_parse_addon_list_with_non_standard_type(self) -> None:
+        """Test that parse_addon_list returns empty list for non-standard types."""
+        loader = ConfigLoader()
+        # This tests line 136 where raw_value is neither None, list, nor string
+        result = loader._parse_addon_list(123)  # pyright: ignore[reportPrivateUsage]
+        assert result == []
+
+    def test_validate_value_for_list_type_not_disabled_addons(self) -> None:
+        """Test that validate_value returns parsed list for non-disabled_addons list params."""
+        loader = ConfigLoader()
+        # Create a parameter with type list but not named disabled_addons
+        param = Parameter(name="other_list", type=list, default=[], help="help")
+
+        result = loader._validate_value(param, ["item1", "item2"])  # pyright: ignore[reportPrivateUsage]
+        # Should return the parsed list without validation
+        assert result == ["item1", "item2"]

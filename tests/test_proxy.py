@@ -114,3 +114,124 @@ class TestProxyServer:
             # Verify asyncio.run was called with start coroutine
             mock_asyncio_run.assert_called_once()
             assert captured["coro"] is mock_asyncio_run.call_args[0][0]
+
+    def test_initialization_with_disabled_addons(self) -> None:
+        """Test ProxyServer initialization with disabled_addons."""
+        server = ProxyServer(disabled_addons=["CSPRemoverAddon", "COEPRemoverAddon"])
+
+        assert server.disabled_addons == ["CSPRemoverAddon", "COEPRemoverAddon"]
+
+    def test_initialization_with_none_disabled_addons(self) -> None:
+        """Test ProxyServer initialization with None disabled_addons defaults to empty list."""
+        server = ProxyServer(disabled_addons=None)
+
+        assert server.disabled_addons == []
+
+    def test_initialization_disabled_addons_defaults_to_empty_list(self) -> None:
+        """Test that disabled_addons defaults to empty list when not specified."""
+        server = ProxyServer()
+
+        assert server.disabled_addons == []
+
+    @pytest.mark.asyncio
+    async def test_start_with_disabled_addons_excludes_addons(self) -> None:
+        """Test that start() excludes disabled addons."""
+        server = ProxyServer(disabled_addons=["CSPRemoverAddon", "COEPRemoverAddon"])
+
+        with (
+            patch("devrelay.proxy.options.Options"),
+            patch("devrelay.proxy.dump.DumpMaster") as mock_dump_master,
+        ):
+            # Setup mocks
+            mock_master_instance = MagicMock()
+            mock_master_instance.run = AsyncMock()
+            mock_dump_master.return_value = mock_master_instance
+
+            # Run start
+            await server.start()
+
+            # Verify only 4 addons were added (6 total - 2 disabled)
+            assert mock_master_instance.addons.add.call_count == 4
+
+            # Verify disabled addons were NOT added
+            added_addon_types = [type(call[0][0]).__name__ for call in mock_master_instance.addons.add.call_args_list]
+            assert "CSPRemoverAddon" not in added_addon_types
+            assert "COEPRemoverAddon" not in added_addon_types
+            # Verify enabled addons were added
+            assert "COOPRemoverAddon" in added_addon_types
+            assert "CORPInserterAddon" in added_addon_types
+
+    @pytest.mark.asyncio
+    async def test_start_with_all_addons_disabled(self) -> None:
+        """Test that start() works when all addons are disabled."""
+        server = ProxyServer(
+            disabled_addons=[
+                "CSPRemoverAddon",
+                "COEPRemoverAddon",
+                "COOPRemoverAddon",
+                "CORPInserterAddon",
+                "CORSInserterForWebhooksAddon",
+                "CORSPreflightForWebhooksAddon",
+            ]
+        )
+
+        with (
+            patch("devrelay.proxy.options.Options"),
+            patch("devrelay.proxy.dump.DumpMaster") as mock_dump_master,
+        ):
+            # Setup mocks
+            mock_master_instance = MagicMock()
+            mock_master_instance.run = AsyncMock()
+            mock_dump_master.return_value = mock_master_instance
+
+            # Run start
+            await server.start()
+
+            # Verify no addons were added
+            assert mock_master_instance.addons.add.call_count == 0
+
+    @pytest.mark.asyncio
+    async def test_start_with_one_addon_disabled(self) -> None:
+        """Test that start() excludes only one disabled addon."""
+        server = ProxyServer(disabled_addons=["CSPRemoverAddon"])
+
+        with (
+            patch("devrelay.proxy.options.Options"),
+            patch("devrelay.proxy.dump.DumpMaster") as mock_dump_master,
+        ):
+            # Setup mocks
+            mock_master_instance = MagicMock()
+            mock_master_instance.run = AsyncMock()
+            mock_dump_master.return_value = mock_master_instance
+
+            # Run start
+            await server.start()
+
+            # Verify 5 addons were added (6 total - 1 disabled)
+            assert mock_master_instance.addons.add.call_count == 5
+
+            # Verify CSP was NOT added but others were
+            added_addon_types = [type(call[0][0]).__name__ for call in mock_master_instance.addons.add.call_args_list]
+            assert "CSPRemoverAddon" not in added_addon_types
+            assert "COEPRemoverAddon" in added_addon_types
+            assert "COOPRemoverAddon" in added_addon_types
+
+    @pytest.mark.asyncio
+    async def test_start_with_empty_disabled_addons(self) -> None:
+        """Test that start() adds all addons when disabled_addons is empty."""
+        server = ProxyServer(disabled_addons=[])
+
+        with (
+            patch("devrelay.proxy.options.Options"),
+            patch("devrelay.proxy.dump.DumpMaster") as mock_dump_master,
+        ):
+            # Setup mocks
+            mock_master_instance = MagicMock()
+            mock_master_instance.run = AsyncMock()
+            mock_dump_master.return_value = mock_master_instance
+
+            # Run start
+            await server.start()
+
+            # Verify all 6 addons were added
+            assert mock_master_instance.addons.add.call_count == 6
