@@ -1,0 +1,112 @@
+name: "CodeQL Advanced Security Scanning"
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+    types: [opened, synchronize, reopened]
+  schedule:
+    # Run every Monday at 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:  # Allow manual triggering
+
+# Cancel in-progress runs for the same workflow
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+  pull-requests: read
+
+jobs:
+  analyze:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['python']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Cache uv dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            .venv
+            ~/.cache/uv
+          key: ${{ runner.os }}-uv-codeql-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Install dependencies
+        run: make dev
+
+      # Initialize CodeQL with custom configuration
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@ab2e54f42aa112ff08704159b88a57517f6f0ebb # v3
+        with:
+          languages: ${{ matrix.language }}
+          config-file: ./.github/codeql/codeql-config.yml
+          # Use latest CodeQL bundle
+          tools: latest
+          # Setup Python dependencies for better analysis
+          setup-python-dependencies: true
+
+      # No explicit build needed for Python (interpreted language)
+      # CodeQL will automatically discover Python code
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@ab2e54f42aa112ff08704159b88a57517f6f0ebb # v3
+        with:
+          category: "/language:${{ matrix.language }}"
+          # Upload SARIF even if there are findings
+          upload: true
+          # Set severity threshold - fail on high/critical
+          fail-on: error
+          # Output SARIF file for artifacts
+          output: codeql-results-${{ matrix.language }}.sarif
+
+      - name: Upload CodeQL results as artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: codeql-results-${{ matrix.language }}
+          path: codeql-results-${{ matrix.language }}.sarif
+          retention-days: 30
+
+  # Summary job to check overall status
+  codeql-summary:
+    name: CodeQL Summary
+    runs-on: ubuntu-latest
+    needs: analyze
+    if: always()
+    steps:
+      - name: Check CodeQL status
+        run: |
+          if [[ "${{ needs.analyze.result }}" == "failure" ]]; then
+            echo "::error::CodeQL analysis found security issues"
+            exit 1
+          elif [[ "${{ needs.analyze.result }}" == "success" ]]; then
+            echo "✓ CodeQL analysis completed successfully"
+          else
+            echo "::warning::CodeQL analysis status: ${{ needs.analyze.result }}"
+          fi

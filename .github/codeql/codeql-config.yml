@@ -1,0 +1,73 @@
+name: "DevRelay CodeQL Config"
+
+# Disable default queries to use custom configuration
+disable-default-queries: false
+
+# Query suites to run
+queries:
+  - name: Extended Security Queries
+    uses: security-extended
+  - name: Security and Quality Queries
+    uses: security-and-quality
+
+# Paths to analyze
+paths:
+  - devrelay
+
+# Paths to ignore during analysis
+paths-ignore:
+  - "**/__pycache__"
+  - "**/*.pyc"
+  - ".venv"
+  - ".pytest_cache"
+  - "htmlcov"
+  - "*.egg-info"
+  - "build"
+  - "dist"
+  - ".git"
+
+# Query filters - customize severity levels
+query-filters:
+  # Exclude specific query IDs if needed (currently none)
+  # - exclude:
+  #     id: py/unused-import
+
+  # Include all error-level queries
+  - include:
+      kind:
+        - problem
+        - path-problem
+      precision:
+        - high
+        - very-high
+
+  # Include security-relevant medium precision queries
+  - include:
+      tags:
+        - security
+      precision:
+        - medium
+
+  # Include all SQL injection queries
+  - include:
+      tags: sql-injection
+
+  # Include all command injection queries
+  - include:
+      tags: command-injection
+
+  # Include all code injection queries
+  - include:
+      tags: code-injection
+
+  # Include all XSS queries
+  - include:
+      tags: xss
+
+  # Include all path traversal queries
+  - include:
+      tags: path-traversal
+
+# Additional packs (Python-specific security queries)
+packs:
+  - codeql/python-queries
