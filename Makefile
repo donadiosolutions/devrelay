@@ -61,7 +61,7 @@ lint: dev
 # Lint markdown files with pymarkdownlnt
 lintmd: dev
 	@echo "Linting markdown files with pymarkdownlnt..."
-	@$(VENV)/bin/pymarkdown --config .pymarkdown.json scan *.md
+	@$(VENV)/bin/pymarkdown --config .pymarkdown.json scan .
 
 # Type check with pyright
 typecheck: dev
