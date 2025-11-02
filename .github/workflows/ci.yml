@@ -16,7 +16,7 @@ jobs:
   # Shared setup for dependency caching
   setup:
     name: Setup Dependencies
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     outputs:
       cache-hit: ${{ steps.cache.outputs.cache-hit }}
     steps:
@@ -48,7 +48,7 @@ jobs:
 
   format:
     name: Code Formatting
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     needs: setup
     steps:
       - name: Checkout repository
@@ -80,7 +80,7 @@ jobs:
 
   lint:
     name: Code Linting
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     needs: setup
     steps:
       - name: Checkout repository
@@ -112,7 +112,7 @@ jobs:
 
   lintmd:
     name: Markdown Linting
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     needs: setup
     steps:
       - name: Checkout repository
@@ -144,7 +144,7 @@ jobs:
 
   typecheck:
     name: Type Checking
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     needs: setup
     steps:
       - name: Checkout repository
@@ -176,7 +176,7 @@ jobs:
 
   test:
     name: Tests & Coverage
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: setup
     permissions:
       contents: read
