@@ -215,9 +215,20 @@ jobs:
         if: always() && github.actor != 'dependabot[bot]'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.xml,./junit.xml
+          files: ./coverage.xml
           flags: unittests
           name: codecov-devrelay
+          fail_ci_if_error: true
+          verbose: true
+
+      - name: Upload test results to Codecov
+        uses: codecov/test-results-action@v1
+        if: always() && github.actor != 'dependabot[bot]'
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./junit.xml
+          flags: unittests
+          name: test-results-devrelay
           fail_ci_if_error: true
           verbose: true
 
