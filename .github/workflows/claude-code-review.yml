@@ -3,12 +3,9 @@ name: Claude Code Review
 on:
   pull_request:
     types: [opened, synchronize]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+    # Don't run when workflow files are modified (causes validation errors)
+    paths-ignore:
+      - '.github/workflows/**'
 
 jobs:
   claude-review:
@@ -19,9 +16,6 @@ jobs:
     #   github.event.pull_request.user.login == 'external-contributor' ||
     #   github.event.pull_request.user.login == 'new-developer' ||
     #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
-
-    # Don't block PR merges if this job fails (e.g., when workflow file is modified or secrets are unavailable)
-    continue-on-error: true
 
     runs-on: ubuntu-latest
     permissions:
