@@ -20,6 +20,9 @@ jobs:
     #   github.event.pull_request.user.login == 'new-developer' ||
     #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
 
+    # Don't block PR merges if this job fails (e.g., when workflow file is modified or secrets are unavailable)
+    continue-on-error: true
+
     runs-on: ubuntu-latest
     permissions:
       contents: read
