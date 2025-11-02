@@ -20,7 +20,7 @@ class DevRelayCLI:
         """
         self.config_loader = ConfigLoader(config_path=config_path)
 
-    def display_startup_info(self, host: str, port: int, certdir: Path) -> None:
+    def display_startup_info(self, host: str, port: int, certdir: Path, disabled_addons: list[str]) -> None:
         """
         Display startup information to the user.
 
@@ -28,12 +28,15 @@ class DevRelayCLI:
             host: Host address being used
             port: Port number being used
             certdir: Certificate directory path
+            disabled_addons: List of disabled addon names
         """
         print(f"Starting DevRelay proxy on {host}:{port}")
         print(f"Certificate directory: {certdir}")
+        if disabled_addons:
+            print(f"Disabled addons: {', '.join(disabled_addons)}")
         print("\nPress Ctrl+C to stop the proxy\n")
 
-    def run_server(self, host: str, port: int, certdir: Path) -> int:
+    def run_server(self, host: str, port: int, certdir: Path, disabled_addons: list[str]) -> int:
         """
         Start and run the proxy server.
 
@@ -41,6 +44,7 @@ class DevRelayCLI:
             host: Host address to bind to
             port: Port number to listen on
             certdir: Certificate directory
+            disabled_addons: List of addon class names to disable
 
         Returns:
             Exit code (0 for success, 1 for error)
@@ -50,6 +54,7 @@ class DevRelayCLI:
                 host=host,
                 port=port,
                 certdir=certdir,
+                disabled_addons=disabled_addons,
             )
             server.run()
         except KeyboardInterrupt:
@@ -73,8 +78,8 @@ class DevRelayCLI:
         """
         try:
             config = self.config_loader.get_config(args)
-            self.display_startup_info(config.host, config.port, config.certdir)
-            return self.run_server(config.host, config.port, config.certdir)
+            self.display_startup_info(config.host, config.port, config.certdir, config.disabled_addons)
+            return self.run_server(config.host, config.port, config.certdir, config.disabled_addons)
         except ValueError as e:
             print(f"Configuration error: {e}", file=sys.stderr)
             return 1

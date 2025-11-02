@@ -96,14 +96,85 @@ To use the proxy, configure your browser to use it:
 ## CLI Options
 
 ```text
-devrelay [-h] [--host HOST] [--port PORT] [--confdir CONFDIR]
+devrelay [-h] [--host HOST] [--port PORT] [--certdir CERTDIR] [--disable-addon ADDON]
 
 Options:
-  -h, --help         Show help message
-  --host HOST        Host address to bind to (default: 127.0.0.1)
-  --port PORT        Port to listen on (default: 8080)
-  --confdir CONFDIR  Certificate directory (default: ~/.mitmproxy)
+  -h, --help              Show help message
+  --host HOST             Host address to bind to (default: 127.0.0.1)
+  --port PORT             Port to listen on (default: 8080)
+  --certdir CERTDIR       Certificate directory (default: ~/.mitmproxy)
+  --disable-addon ADDON   Disable specific addon(s) (can be used multiple times)
 ```
+
+### Disabling Addons
+
+You can selectively disable specific addons using the `--disable-addon` option.
+This is useful when you only need to remove specific security headers.
+
+**Available addons:**
+
+- `CSP` - Content-Security-Policy remover
+- `COEP` - Cross-Origin-Embedder-Policy remover
+- `COOP` - Cross-Origin-Opener-Policy remover
+- `CORP` - Cross-Origin-Resource-Policy inserter
+- `CORSInserter` - CORS headers inserter for webhooks
+- `CORSPreflight` - CORS preflight handler for webhooks
+
+**Examples:**
+
+Disable CSP and COEP addons:
+
+```bash
+devrelay --disable-addon CSP --disable-addon COEP
+```
+
+Disable multiple addons with comma-separated values:
+
+```bash
+devrelay --disable-addon CSP,COEP,COOP
+```
+
+Combine addon disabling with other options:
+
+```bash
+devrelay --host 0.0.0.0 --port 9090 --disable-addon CSP
+```
+
+You can also use full addon class names:
+
+```bash
+devrelay --disable-addon CSPRemoverAddon --disable-addon COEPRemoverAddon
+```
+
+Addon names are case-insensitive:
+
+```bash
+devrelay --disable-addon csp --disable-addon COEP
+```
+
+## Configuration File
+
+DevRelay supports configuration via a YAML file located at `~/.mitmproxy/devrelay.yaml`.
+The file is automatically created with default values on first run.
+
+**Example configuration:**
+
+```yaml
+host: 127.0.0.1
+port: 8080
+certdir: /home/user/.mitmproxy
+disabled_addons:
+  - CSP
+  - COEP
+```
+
+Configuration precedence (highest to lowest):
+
+1. Command-line arguments
+2. YAML configuration file
+3. Default values
+
+This means CLI arguments will override values in the YAML file.
 
 ## Development
 

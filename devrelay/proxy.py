@@ -40,6 +40,7 @@ class ProxyServer:
         host: str = "127.0.0.1",
         port: int = 8080,
         certdir: Path = Path.home() / ".mitmproxy",
+        disabled_addons: list[str] | None = None,
     ) -> None:
         """
         Initialize the proxy server.
@@ -48,10 +49,12 @@ class ProxyServer:
             host: Host address to bind to (default: 127.0.0.1)
             port: Port to listen on (default: 8080)
             certdir: Certificate directory (default: ~/.mitmproxy)
+            disabled_addons: List of addon class names to disable (default: None)
         """
         self.host = host
         self.port = port
         self.certdir = certdir
+        self.disabled_addons = disabled_addons or []
 
     async def start(self) -> None:
         """Start the proxy server."""
@@ -74,12 +77,21 @@ class ProxyServer:
             with_termlog=True,
             with_dumper=False,
         )
-        master.addons.add(CSPRemoverAddon())
-        master.addons.add(COEPRemoverAddon())
-        master.addons.add(COOPRemoverAddon())
-        master.addons.add(CORPInserterAddon())
-        master.addons.add(CORSInserterForWebhooksAddon())
-        master.addons.add(CORSPreflightForWebhooksAddon())
+
+        # Define all available addons
+        available_addons = {
+            "CSPRemoverAddon": CSPRemoverAddon(),
+            "COEPRemoverAddon": COEPRemoverAddon(),
+            "COOPRemoverAddon": COOPRemoverAddon(),
+            "CORPInserterAddon": CORPInserterAddon(),
+            "CORSInserterForWebhooksAddon": CORSInserterForWebhooksAddon(),
+            "CORSPreflightForWebhooksAddon": CORSPreflightForWebhooksAddon(),
+        }
+
+        # Load only enabled addons (not in disabled list)
+        for addon_name, addon_instance in available_addons.items():
+            if addon_name not in self.disabled_addons:
+                master.addons.add(addon_instance)
 
         try:
             await master.run()

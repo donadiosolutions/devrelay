@@ -7,6 +7,8 @@ from typing import Any
 
 from ruamel.yaml import YAML
 
+from devrelay.addons import validate_addon_names
+
 
 @dataclass
 class Parameter:
@@ -53,6 +55,12 @@ class ConfigLoader:
                 default=Path.home() / ".mitmproxy",
                 help="Certificate directory",
             ),
+            Parameter(
+                name="disabled_addons",
+                type=list,
+                default=[],
+                help="Comma-separated list of addons to disable (e.g., CSP,COEP)",
+            ),
         ]
 
         self.parser = self._build_parser()
@@ -70,14 +78,62 @@ class ConfigLoader:
         )
 
         for param in self.parameters:
-            parser.add_argument(
-                f"--{param.name}",
-                type=param.type,
-                default=param.default,
-                help=param.help,
-            )
+            # Special handling for list types (disabled_addons)
+            if param.type == list:
+                # Use --disable-addon (singular) for better UX
+                arg_name = "--disable-addon"
+                # action='append' allows repeated usage: --disable-addon CSP --disable-addon COEP
+                parser.add_argument(
+                    arg_name,
+                    action="append",
+                    default=None,  # Use None to detect if user provided values
+                    help=param.help,
+                    dest=param.name,  # Store in disabled_addons
+                )
+            else:
+                parser.add_argument(
+                    f"--{param.name}",
+                    type=param.type,
+                    default=param.default,
+                    help=param.help,
+                )
 
         return parser
+
+    def _parse_addon_list(self, raw_value: Any) -> list[str]:
+        """
+        Parse addon list from CLI or YAML format.
+
+        Handles both comma-separated strings and lists.
+        CLI format: --disable-addon CSP,COEP or --disable-addon CSP --disable-addon COEP
+        YAML format: disabled_addons: [CSP, COEP] or disabled_addons: CSP,COEP
+
+        Args:
+            raw_value: Raw value from CLI or YAML (None, str, or list)
+
+        Returns:
+            Parsed list of addon names
+        """
+        if raw_value is None:
+            return []
+
+        # If it's already a list (from action='append' or YAML)
+        if isinstance(raw_value, list):
+            # Flatten and split comma-separated values
+            result = []
+            for item in raw_value:
+                if isinstance(item, str):
+                    # Split by comma and strip whitespace
+                    result.extend([x.strip() for x in item.split(",") if x.strip()])
+                else:
+                    result.append(item)
+            return result
+
+        # If it's a string (from YAML), split by comma
+        if isinstance(raw_value, str):
+            return [x.strip() for x in raw_value.split(",") if x.strip()]
+
+        return []
 
     def _load_yaml(self) -> dict[str, Any]:
         """
@@ -127,6 +183,9 @@ class ConfigLoader:
             ValueError: If value is invalid
         """
         if value is None:
+            # For list types, return empty list instead of None
+            if param.type == list:
+                return []
             return None
 
         # Type conversion
@@ -147,6 +206,13 @@ class ConfigLoader:
                 return result
             elif param.type == str:
                 return str(value)
+            elif param.type == list:
+                # Handle list types (currently only disabled_addons)
+                parsed_list = self._parse_addon_list(value)
+                # Validate addon names if this is the disabled_addons parameter
+                if param.name == "disabled_addons":
+                    return validate_addon_names(parsed_list)
+                return parsed_list
             else:  # pragma: no cover
                 return value
         except (ValueError, TypeError):
@@ -203,7 +269,11 @@ class ConfigLoader:
             cli_value = getattr(cli_args, param.name)
 
             # Check if CLI value is the default (meaning user didn't provide it)
-            is_cli_default = cli_value == param.default
+            # For list types, CLI default is None, so check for None explicitly
+            if param.type == list:
+                is_cli_default = cli_value is None
+            else:
+                is_cli_default = cli_value == param.default
 
             if is_cli_default and param.name in yaml_config:
                 # Use YAML value if CLI wasn't provided

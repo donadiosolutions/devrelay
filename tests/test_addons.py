@@ -5,6 +5,7 @@ Tests CSPRemoverAddon, COEPRemoverAddon, COOPRemoverAddon, CORPInserterAddon, CO
 and CORSPreflightForWebhooksAddon.
 """
 
+import pytest
 from mitmproxy.test import tflow
 
 from devrelay.addons import (
@@ -14,6 +15,7 @@ from devrelay.addons import (
     CORSInserterForWebhooksAddon,
     CORSPreflightForWebhooksAddon,
     CSPRemoverAddon,
+    validate_addon_names,
 )
 
 
@@ -792,3 +794,116 @@ class TestCORSInserterForWebhooksAddon:
         assert flow.response.headers["Cache-Control"] == "no-cache"
         # And CORS headers were added
         assert flow.response.headers["Access-Control-Allow-Origin"] == "*"
+
+
+class TestValidateAddonNames:
+    """Test cases for validate_addon_names function."""
+
+    def test_validate_short_names(self) -> None:
+        """Test that short addon names are validated and normalized."""
+        result = validate_addon_names(["CSP", "COEP"])
+        assert result == ["CSPRemoverAddon", "COEPRemoverAddon"]
+
+    def test_validate_full_class_names(self) -> None:
+        """Test that full class names are validated."""
+        result = validate_addon_names(["CSPRemoverAddon", "COEPRemoverAddon"])
+        assert result == ["CSPRemoverAddon", "COEPRemoverAddon"]
+
+    def test_validate_case_insensitive(self) -> None:
+        """Test that validation is case-insensitive."""
+        result = validate_addon_names(["csp", "COEP", "CsP"])
+        assert result == ["CSPRemoverAddon", "COEPRemoverAddon", "CSPRemoverAddon"]
+
+    def test_validate_all_addon_names(self) -> None:
+        """Test that all valid addon names can be validated."""
+        result = validate_addon_names(["CSP", "COEP", "COOP", "CORP", "CORSInserter", "CORSPreflight"])
+        assert result == [
+            "CSPRemoverAddon",
+            "COEPRemoverAddon",
+            "COOPRemoverAddon",
+            "CORPInserterAddon",
+            "CORSInserterForWebhooksAddon",
+            "CORSPreflightForWebhooksAddon",
+        ]
+
+    def test_validate_empty_list(self) -> None:
+        """Test that empty list returns empty list."""
+        result = validate_addon_names([])
+        assert result == []
+
+    def test_validate_mixed_formats(self) -> None:
+        """Test that mixed short and full names work together."""
+        result = validate_addon_names(["CSP", "COEPRemoverAddon", "coop"])
+        assert result == ["CSPRemoverAddon", "COEPRemoverAddon", "COOPRemoverAddon"]
+
+    def test_invalid_addon_name_with_close_match(self) -> None:
+        """Test that invalid addon name raises ValueError with suggestion."""
+        with pytest.raises(ValueError) as excinfo:
+            validate_addon_names(["CS"])
+        assert "Unknown addon 'CS'" in str(excinfo.value)
+        assert "Did you mean 'CSP'?" in str(excinfo.value)
+
+    def test_invalid_addon_name_with_typo(self) -> None:
+        """Test that typo in addon name suggests correct name."""
+        with pytest.raises(ValueError) as excinfo:
+            validate_addon_names(["CEOP"])  # Typo in COEP
+        assert "Unknown addon 'CEOP'" in str(excinfo.value)
+        assert "Did you mean" in str(excinfo.value)
+
+    def test_invalid_addon_name_no_close_match(self) -> None:
+        """Test that completely invalid name lists all valid options."""
+        with pytest.raises(ValueError) as excinfo:
+            validate_addon_names(["InvalidAddon"])
+        assert "Unknown addon 'InvalidAddon'" in str(excinfo.value)
+        assert "Valid addons:" in str(excinfo.value)
+        assert "CSP" in str(excinfo.value)
+
+    def test_first_invalid_name_reported_only(self) -> None:
+        """Test that only the first invalid name is reported."""
+        with pytest.raises(ValueError) as excinfo:
+            validate_addon_names(["CSP", "Invalid1", "Invalid2"])
+        # Should only mention Invalid1, not Invalid2
+        assert "Invalid1" in str(excinfo.value)
+        assert "Invalid2" not in str(excinfo.value)
+
+    def test_validate_duplicate_names(self) -> None:
+        """Test that duplicate names are preserved in output."""
+        result = validate_addon_names(["CSP", "CSP", "COEP"])
+        assert result == ["CSPRemoverAddon", "CSPRemoverAddon", "COEPRemoverAddon"]
+
+    def test_validate_cors_inserter_short_name(self) -> None:
+        """Test that CORSInserter short name works."""
+        result = validate_addon_names(["CORSInserter"])
+        assert result == ["CORSInserterForWebhooksAddon"]
+
+    def test_validate_cors_preflight_short_name(self) -> None:
+        """Test that CORSPreflight short name works."""
+        result = validate_addon_names(["CORSPreflight"])
+        assert result == ["CORSPreflightForWebhooksAddon"]
+
+    def test_invalid_addon_name_suggests_short_name_when_available(self) -> None:
+        """Test that suggestions prefer short names over full class names."""
+        with pytest.raises(ValueError) as excinfo:
+            validate_addon_names(["COEP123"])  # Close to COEP but not exact
+        # Should suggest a short name like COEP, not the full class name
+        error_msg = str(excinfo.value)
+        assert "Unknown addon 'COEP123'" in error_msg
+        assert "Did you mean" in error_msg
+
+    def test_invalid_addon_name_suggests_full_name_when_no_short_name(self) -> None:
+        """Test that suggestions use full class name when no short name found."""
+        # Mock ADDON_NAME_MAP to have only long names (> 15 chars, no short names)
+        from unittest.mock import patch
+
+        mock_map = {
+            "VERYLONGADDONNAMEWITHOUTSHORTVERSION": "CSPRemoverAddon",
+            "CSPREMOVERADDONVERYLONGNAME": "CSPRemoverAddon",  # 27 chars, > 15
+        }
+        with patch("devrelay.addons.ADDON_NAME_MAP", mock_map):
+            with pytest.raises(ValueError) as excinfo:
+                validate_addon_names(["CSPREMOVERADDONVERYLONGNAMETYPO"])  # Close to long name
+            error_msg = str(excinfo.value)
+            assert "Unknown addon 'CSPREMOVERADDONVERYLONGNAMETYPO'" in error_msg
+            assert "Did you mean" in error_msg
+            # Should suggest the full canonical name since no short name <= 15 chars exists
+            assert "CSPRemoverAddon" in error_msg
