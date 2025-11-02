@@ -3,6 +3,9 @@
 import difflib
 from mitmproxy import http
 
+# Maximum length for addon names to be considered "short" for user-friendly suggestions
+SHORT_NAME_MAX_LENGTH = 15
+
 # Addon name mapping for user-friendly names
 # Maps both short names and full class names to canonical class names
 ADDON_NAME_MAP = {
@@ -21,16 +24,6 @@ ADDON_NAME_MAP = {
     "CORSINSERTERFORWEBHOOKSADDON": "CORSInserterForWebhooksAddon",
     "CORSPREFLIGHTFORWEBHOOKSADDON": "CORSPreflightForWebhooksAddon",
 }
-
-# All valid addon class names
-ALL_ADDON_NAMES = [
-    "CSPRemoverAddon",
-    "COEPRemoverAddon",
-    "COOPRemoverAddon",
-    "CORPInserterAddon",
-    "CORSInserterForWebhooksAddon",
-    "CORSPreflightForWebhooksAddon",
-]
 
 
 def validate_addon_names(addon_names: list[str]) -> list[str]:
@@ -73,7 +66,7 @@ def validate_addon_names(addon_names: list[str]) -> list[str]:
                 # Find a user-friendly version (prefer short names)
                 user_friendly = None
                 for key, value in ADDON_NAME_MAP.items():
-                    if value == suggested_canonical and len(key) <= 15:  # Prefer short names
+                    if value == suggested_canonical and len(key) <= SHORT_NAME_MAX_LENGTH:
                         user_friendly = key
                         break
                 if user_friendly is None:
@@ -81,8 +74,9 @@ def validate_addon_names(addon_names: list[str]) -> list[str]:
 
                 raise ValueError(f"Unknown addon '{name}'. Did you mean '{user_friendly}'?")
             else:
-                # No close match - list all valid options
-                valid_short_names = ["CSP", "COEP", "COOP", "CORP", "CORSInserter", "CORSPreflight"]
+                # No close match - list all valid short names
+                # Derive short names from ADDON_NAME_MAP (names <= SHORT_NAME_MAX_LENGTH chars)
+                valid_short_names = sorted(set(k for k in ADDON_NAME_MAP.keys() if len(k) <= SHORT_NAME_MAX_LENGTH))
                 raise ValueError(f"Unknown addon '{name}'. Valid addons: {', '.join(valid_short_names)}")
 
     return validated
